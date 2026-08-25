@@ -4,12 +4,32 @@ import { createHash } from "node:crypto";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
 const run = promisify(execFile);
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+test("release shortcuts calculate stable versions and invoke the PR/tag workflow", async () => {
+  const releaseModule = await import(
+    pathToFileURL(join(projectRoot, "scripts", "release.mjs")).href
+  );
+  assert.equal(releaseModule.nextStableVersion("1.2.3", "patch"), "1.2.4");
+  assert.equal(releaseModule.nextStableVersion("1.2.3", "minor"), "1.3.0");
+  assert.equal(releaseModule.nextStableVersion("1.2.3", "major"), "2.0.0");
+  assert.throws(() => releaseModule.nextStableVersion("1.2.3-beta.1", "patch"));
+
+  const packageJson = JSON.parse(await readFile(join(projectRoot, "package.json"), "utf8"));
+  for (const bump of ["patch", "minor", "major"]) {
+    assert.equal(packageJson.scripts[`release:${bump}`], `node scripts/release.mjs ${bump}`);
+    const runConfiguration = await readFile(
+      join(projectRoot, ".run", `${bump}.run.xml`),
+      "utf8",
+    );
+    assert.match(runConfiguration, new RegExp(`<script value="release:${bump}"`));
+  }
+});
 
 test("bundle collector enforces every matrix updater family and signature", async () => {
   const definitions = {
@@ -423,6 +443,10 @@ test("release workflow gates secrets and pins the auth SDK to a repository SHA",
   );
 
   assert.match(workflow, /AUTH_SDK_SHA: [0-9a-f]{40}/);
+  assert.match(workflow, /^on:\r?\n\s+push:\r?\n\s+tags: \["v\*"\]/m);
+  assert.doesNotMatch(workflow, /^\s+pull_request:/m);
+  assert.doesNotMatch(workflow, /^\s+branches:/m);
+  assert.doesNotMatch(workflow, /^\s+workflow_dispatch:/m);
   assert.doesNotMatch(workflow, /vars\.AUTH_(?:CORE|SDK)_SHA/);
   assert.match(
     workflow,
@@ -443,7 +467,8 @@ test("release workflow gates secrets and pins the auth SDK to a repository SHA",
   assert.match(workflow, /vars\.S3_PUBLIC_BASE_URL/);
   assert.match(workflow, /vars\.S3_ENDPOINT_URL/);
   assert.match(workflow, /vars\.S3_BUCKET/);
-  assert.match(workflow, /macos-15/);
+  assert.match(workflow, /macos-26/);
+  assert.match(workflow, /Prepare Tauri frontend directory/);
   assert.match(workflow, /universal-apple-darwin/);
   assert.match(workflow, /libpulse-dev/);
   assert.match(workflow, /Create GitHub release without GitHub-hosted assets/);

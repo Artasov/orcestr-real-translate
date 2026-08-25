@@ -135,9 +135,21 @@ npm run test:rust
 
 ## CI и релизы
 
-Pull requests и `main` проверяют синхронизацию версий, TypeScript, renderer tests, release tooling,
-production renderer build и Rust unit tests. Теги `vX.Y.Z` собирают Windows (`nsis`, `msi`), macOS
-(`app`, `dmg`) и Linux (`AppImage`, `deb`) bundles.
+GitHub Actions запускается только при push тега `vX.Y.Z`. Обычные push и pull request не запускают
+release pipeline. Перед созданием тега локальные release-команды проверяют синхронизацию версий,
+TypeScript, renderer tests, release tooling, production renderer build и Rust unit tests. Затем они
+создают release-ветку и PR, выполняют squash merge в `main` и только после подтверждённого merge
+публикуют тег. Тег собирает Windows (`nsis`, `msi`), macOS (`app`, `dmg`) и Linux (`AppImage`, `deb`)
+bundles.
+
+Для выпуска версии используйте `.run/patch.run.xml`, `.run/minor.run.xml` или `.run/major.run.xml`,
+либо соответствующую команду:
+
+```powershell
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
 
 Артефакты и подписи Tauri updater публикуются в неизменяемые versioned S3 prefixes. Канал
 `latest.json` обновляется только после проверки всех платформенных артефактов. Release CI фиксирует
@@ -182,9 +194,9 @@ npx tauri signer generate -w "$env:USERPROFILE\.tauri\orcestr-real-translate.key
 - придуманный при генерации пароль добавляется в `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; если пароль
   оставлен пустым, этот secret не нужен.
 
-До первого публичного релиза текущий public key, временно совпадающий с XEXAMAI, нужно заменить на
-новый `.key.pub` Real Translate. После первого релиза пару ключей необходимо хранить в защищённом
-backup: потеря private key лишит уже установленные версии возможности принять следующие обновления.
+В `tauri.conf.json` зафиксирован отдельный public key Real Translate. После первого релиза эту пару
+ключей необходимо хранить в защищённом backup: потеря private key лишит уже установленные версии
+возможности принять следующие обновления.
 `GITHUB_TOKEN` GitHub Actions создаёт автоматически — добавлять его вручную не нужно. После успешного
 релиза CI также обновляет `downloads.json`, из которого продуктовый лендинг получает прямые S3-ссылки.
 

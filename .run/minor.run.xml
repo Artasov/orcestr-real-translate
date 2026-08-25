@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Bump minor version (no git operations)" type="js.build_tools.npm">
+  <configuration default="false" name="Release minor (PR + tag + push)" type="js.build_tools.npm">
     <package-json value="$PROJECT_DIR$/package.json" />
     <command value="run" />
     <scripts>
-      <script value="version:minor" />
+      <script value="release:minor" />
     </scripts>
     <node-interpreter value="project" />
     <envs />

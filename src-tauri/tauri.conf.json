@@ -41,7 +41,7 @@
       ]
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUwNTk1ODU3RjIzRUIyQzcKUldUSHNqN3lWMWhaNERQUnVsTnljdUFuOXJxY0cyREo5bFpCS3dlNkowalpwUUFpbDZLYTJleE0K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDM3RTI1QkZFRUY4NjM2QzkKUldUSk5vYnYvbHZpTjBlbkhIV043ZEduMUc5SThUa09IeHRoVjY0dndOWWo4cERQZnQ4RTlyZVEK",
       "endpoints": [
         "https://s3.twcstorage.ru/324718a4-2cc5dd7a-917b-4e82-87c5-b9d5f8de16ba/orcestr-real-translate/latest.json"
       ],

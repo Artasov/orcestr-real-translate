@@ -24,6 +24,10 @@
     "version:patch": "node scripts/version-bump.mjs patch",
     "version:minor": "node scripts/version-bump.mjs minor",
     "version:major": "node scripts/version-bump.mjs major",
+    "release:check": "npm run typecheck && npm test && npm run test:tooling && npm run test:rust",
+    "release:patch": "node scripts/release.mjs patch",
+    "release:minor": "node scripts/release.mjs minor",
+    "release:major": "node scripts/release.mjs major",
     "check": "npm run version:check && npm run typecheck && npm test && npm run test:tooling && npm run test:rust"
   },
   "dependencies": {

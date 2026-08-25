@@ -136,9 +136,20 @@ npm run test:rust
 
 ## CI and releases
 
-Pull requests and `main` run synchronized-version checks, TypeScript typechecking, renderer tests,
-release-tooling tests, a production renderer build and Rust unit tests. Tags matching `vX.Y.Z` build
-Windows (`nsis`, `msi`), macOS (`app`, `dmg`) and Linux (`AppImage`, `deb`) bundles.
+GitHub Actions runs only when a `vX.Y.Z` tag is pushed. Ordinary pushes and pull requests do not
+start the release pipeline. Before a tag is created, the local release commands check synchronized
+versions, TypeScript, renderer tests, release tooling, the production renderer build and Rust unit
+tests. They create a release branch and PR, squash-merge it into `main`, and publish the tag only
+after the merge is confirmed. The tag builds Windows (`nsis`, `msi`), macOS (`app`, `dmg`) and Linux
+(`AppImage`, `deb`) bundles.
+
+Create a release with `.run/patch.run.xml`, `.run/minor.run.xml` or `.run/major.run.xml`, or run:
+
+```powershell
+npm run release:patch
+npm run release:minor
+npm run release:major
+```
 
 Release artifacts and Tauri updater signatures are published to immutable versioned S3 prefixes.
 The mutable `latest.json` channel is promoted only after every platform artifact has been verified.
@@ -182,9 +193,9 @@ The command asks you to choose a password and creates the private
 - Add the password chosen during generation to `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Omit this
   secret when the key has no password.
 
-Before the first public release, replace the current public key—which temporarily matches XEXAMAI—
-with the new Real Translate `.key.pub`. After the first release, keep the key pair in a secure
-backup: losing the private key prevents already-installed builds from accepting future updates.
+`tauri.conf.json` contains the dedicated Real Translate public key. After the first release, keep
+this key pair in a secure backup: losing the private key prevents already-installed builds from
+accepting future updates.
 `GITHUB_TOKEN` is supplied automatically by GitHub Actions and must not be added manually.
 Successful release publication also promotes `downloads.json`, which powers the download buttons
 on the Orcestr product landing.
