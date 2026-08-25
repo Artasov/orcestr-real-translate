@@ -192,14 +192,7 @@ impl SpeechDynamicsProcessor {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum PackedSampleEncoding {
-    PcmInteger,
-    Float,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PackedAudioFormat {
-    pub encoding: PackedSampleEncoding,
     pub channels: u16,
     pub sample_rate: u32,
     pub block_align: u16,
@@ -445,16 +438,7 @@ pub(crate) fn decode_packed_audio(
         for channel in 0..channels {
             let offset = frame_offset + channel * bytes_per_sample;
             let bytes = &data[offset..offset + bytes_per_sample];
-            let sample = match format.encoding {
-                PackedSampleEncoding::Float => match format.container_bits {
-                    32 => f32::from_le_bytes(bytes.try_into().expect("validated f32 width")),
-                    64 => f64::from_le_bytes(bytes.try_into().expect("validated f64 width")) as f32,
-                    bits => return Err(format!("Unsupported float container: {bits} bits")),
-                },
-                PackedSampleEncoding::PcmInteger => {
-                    decode_pcm_integer(bytes, format.container_bits, format.valid_bits)?
-                }
-            };
+            let sample = decode_pcm_integer(bytes, format.container_bits, format.valid_bits)?;
             samples.push(sanitize_sample(sample).clamp(-1.0, 1.0));
         }
     }
@@ -578,24 +562,15 @@ mod tests {
     }
 
     #[test]
-    fn packed_decoder_distinguishes_pcm32_and_float32() {
+    fn packed_decoder_handles_pcm32() {
         let pcm = PackedAudioFormat {
-            encoding: PackedSampleEncoding::PcmInteger,
             channels: 1,
             sample_rate: 48_000,
             block_align: 4,
             container_bits: 32,
             valid_bits: 32,
         };
-        let float = PackedAudioFormat {
-            encoding: PackedSampleEncoding::Float,
-            ..pcm
-        };
         assert!(decode_packed_audio(&i32::MAX.to_le_bytes(), 1, pcm, false).unwrap()[0] > 0.999);
-        assert_eq!(
-            decode_packed_audio(&0.5_f32.to_le_bytes(), 1, float, false).unwrap(),
-            vec![0.5]
-        );
     }
 
     #[test]

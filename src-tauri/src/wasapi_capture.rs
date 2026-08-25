@@ -8,7 +8,7 @@ use windows::core::{Interface, HRESULT};
 use windows::Win32::Media::Audio::*;
 use windows::Win32::System::Com::*;
 
-use super::audio_processing::{decode_packed_audio, PackedAudioFormat, PackedSampleEncoding};
+use super::audio_processing::{decode_packed_audio, PackedAudioFormat};
 use super::{CapturePcmSink, WINDOWS_PROCESS_LOOPBACK_ID};
 
 const WAVE_FORMAT_PCM: u16 = 0x0001;
@@ -83,7 +83,6 @@ unsafe fn run_wasapi_loopback_initialized(
         cbSize: 0,
     };
     let format = PackedAudioFormat {
-        encoding: PackedSampleEncoding::PcmInteger,
         channels: PROCESS_LOOPBACK_CHANNELS,
         sample_rate: PROCESS_LOOPBACK_SAMPLE_RATE,
         block_align,

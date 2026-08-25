@@ -295,16 +295,18 @@ export function TranslateWorkspace({
         className="workspace-tabs"
       >
         <div className="workspace-navigation">
-          <Tabs.List aria-label={app.workspace.sections}>
-            <Tabs.Trigger value="live" icon={<LuRadio size={15} />}>
-              {app.workspace.live}
-            </Tabs.Trigger>
-            <Tabs.Trigger value="settings" icon={<LuSettings size={15} />}>
-              {app.workspace.settings}
-            </Tabs.Trigger>
-          </Tabs.List>
-          <div className="workspace-navigation-actions">
+          <div className="workspace-navigation-primary">
+            <Tabs.List aria-label={app.workspace.sections}>
+              <Tabs.Trigger value="live" icon={<LuRadio size={15} />}>
+                {app.workspace.live}
+              </Tabs.Trigger>
+              <Tabs.Trigger value="settings" icon={<LuSettings size={15} />}>
+                {app.workspace.settings}
+              </Tabs.Trigger>
+            </Tabs.List>
             <LanguageMenu />
+          </div>
+          <div className="workspace-navigation-actions">
             {activeTab === "live" || running ? (
               <Button
                 type="button"
