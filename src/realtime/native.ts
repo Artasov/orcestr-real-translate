@@ -20,6 +20,10 @@ export const nativeRealtime = {
     channel: RealtimeStartRequest["channel"],
     enabled: boolean,
   ) => invoke<void>("realtime_set_playback_enabled", { channel, enabled }),
+  setPlaybackVolume: (
+    channel: RealtimeStartRequest["channel"],
+    volumeDb: number,
+  ) => invoke<void>("realtime_set_playback_volume", { channel, volumeDb }),
   stop: (channel: RealtimeStartRequest["channel"]) =>
     invoke<void>("realtime_stop", { channel }),
   stopAll: () => invoke<void>("realtime_stop_all"),

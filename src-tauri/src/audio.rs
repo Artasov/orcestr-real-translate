@@ -1,5 +1,5 @@
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{mpsc as std_mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -35,6 +35,8 @@ const LEVEL_INTERVAL: Duration = Duration::from_millis(50);
 const PLAYBACK_QUEUE_CHUNKS: usize = 24;
 const MAX_PLAYBACK_INPUT_BYTES: usize = REALTIME_SAMPLE_RATE as usize * 2 * 4;
 const MAX_PLAYBACK_BUFFER_SECONDS: usize = 5;
+pub(crate) const PLAYBACK_VOLUME_MIN_DB: f32 = -24.0;
+pub(crate) const PLAYBACK_VOLUME_MAX_DB: f32 = 12.0;
 #[cfg(windows)]
 pub(crate) const WINDOWS_PROCESS_LOOPBACK_ID: &str = "windows-process-loopback";
 #[cfg(target_os = "macos")]
@@ -99,6 +101,7 @@ impl Drop for CaptureHandle {
 #[must_use = "dropping PlaybackHandle does not synchronously join its native worker; call stop"]
 pub struct PlaybackHandle {
     audio_tx: Sender<Vec<i16>>,
+    gain: Arc<AtomicU32>,
     cancel: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
     worker: Option<thread::JoinHandle<()>>,
@@ -125,6 +128,15 @@ impl PlaybackHandle {
                 TrySendError::Closed(_) => peek_error(&self.error)
                     .unwrap_or_else(|| "Audio playback has stopped".to_string()),
             })
+    }
+
+    pub fn set_volume_db(&self, volume_db: f32) -> Result<(), String> {
+        let volume_db = normalize_playback_volume_db(volume_db)?;
+        self.gain.store(
+            playback_gain_from_db(volume_db).to_bits(),
+            Ordering::Relaxed,
+        );
+        Ok(())
     }
 
     pub fn stop(mut self) -> Result<(), String> {
@@ -292,14 +304,17 @@ pub fn start_capture(
     }
 }
 
-pub fn start_playback(output_id: Option<&str>) -> Result<PlaybackHandle, String> {
+pub fn start_playback(output_id: Option<&str>, volume_db: f32) -> Result<PlaybackHandle, String> {
     let requested_id = normalize_requested_id(output_id)?;
+    let volume_db = normalize_playback_volume_db(volume_db)?;
     let cancel = Arc::new(AtomicBool::new(false));
+    let gain = Arc::new(AtomicU32::new(playback_gain_from_db(volume_db).to_bits()));
     let error = Arc::new(Mutex::new(None));
     let (audio_tx, audio_rx) = mpsc::channel(PLAYBACK_QUEUE_CHUNKS);
     let (ready_tx, ready_rx) = std_mpsc::sync_channel(1);
     let worker_cancel = cancel.clone();
     let worker_error = error.clone();
+    let worker_gain = gain.clone();
     let worker = thread::Builder::new()
         .name("orcestr-audio-playback".to_string())
         .spawn(move || {
@@ -308,6 +323,7 @@ pub fn start_playback(output_id: Option<&str>) -> Result<PlaybackHandle, String>
                 audio_rx,
                 worker_cancel,
                 worker_error,
+                worker_gain,
                 ready_tx,
             )
         })
@@ -316,6 +332,7 @@ pub fn start_playback(output_id: Option<&str>) -> Result<PlaybackHandle, String>
     match ready_rx.recv_timeout(START_TIMEOUT) {
         Ok(Ok(())) => Ok(PlaybackHandle {
             audio_tx,
+            gain,
             cancel,
             error,
             worker: Some(worker),
@@ -614,6 +631,7 @@ fn run_playback_worker(
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     cancel: Arc<AtomicBool>,
     error: Arc<Mutex<Option<String>>>,
+    gain: Arc<AtomicU32>,
     ready_tx: std_mpsc::SyncSender<Result<(), String>>,
 ) {
     let result = (|| -> Result<(), String> {
@@ -621,7 +639,7 @@ fn run_playback_worker(
         let device = select_output_device(&host, output_id)?;
         let (supported, sample_format) = choose_output_config(&device)?;
         let config: StreamConfig = supported.into();
-        let processor = PlaybackProcessor::new(config.sample_rate);
+        let processor = PlaybackProcessor::new(config.sample_rate, gain);
         let stream = build_output_stream(
             &device,
             &config,
@@ -652,14 +670,16 @@ struct PlaybackProcessor {
     resampler: StreamingMonoResampler,
     pending: VecDeque<f32>,
     max_pending: usize,
+    gain: Arc<AtomicU32>,
 }
 
 impl PlaybackProcessor {
-    fn new(output_rate: u32) -> Self {
+    fn new(output_rate: u32, gain: Arc<AtomicU32>) -> Self {
         Self {
             resampler: StreamingMonoResampler::new(REALTIME_SAMPLE_RATE, output_rate),
             pending: VecDeque::new(),
             max_pending: output_rate as usize * MAX_PLAYBACK_BUFFER_SECONDS,
+            gain,
         }
     }
 
@@ -674,7 +694,31 @@ impl PlaybackProcessor {
     }
 
     fn next_sample(&mut self) -> f32 {
-        self.pending.pop_front().unwrap_or(0.0)
+        let sample = self.pending.pop_front().unwrap_or(0.0);
+        apply_playback_gain(sample, f32::from_bits(self.gain.load(Ordering::Relaxed)))
+    }
+}
+
+pub(crate) fn normalize_playback_volume_db(volume_db: f32) -> Result<f32, String> {
+    if !volume_db.is_finite()
+        || !(PLAYBACK_VOLUME_MIN_DB..=PLAYBACK_VOLUME_MAX_DB).contains(&volume_db)
+    {
+        return Err(format!(
+            "Playback volume must be between {PLAYBACK_VOLUME_MIN_DB} and {PLAYBACK_VOLUME_MAX_DB} dB"
+        ));
+    }
+    Ok(volume_db)
+}
+
+fn playback_gain_from_db(volume_db: f32) -> f32 {
+    10.0_f32.powf(volume_db / 20.0)
+}
+
+fn apply_playback_gain(sample: f32, gain: f32) -> f32 {
+    if gain <= 1.0 {
+        sample * gain
+    } else {
+        (sample * gain).tanh() / gain.tanh()
     }
 }
 
@@ -1008,6 +1052,38 @@ fn take_error(slot: &Arc<Mutex<Option<String>>>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn playback_volume_db_validates_supported_range() {
+        assert_eq!(normalize_playback_volume_db(0.0).unwrap(), 0.0);
+        assert_eq!(
+            normalize_playback_volume_db(PLAYBACK_VOLUME_MIN_DB).unwrap(),
+            PLAYBACK_VOLUME_MIN_DB
+        );
+        assert_eq!(
+            normalize_playback_volume_db(PLAYBACK_VOLUME_MAX_DB).unwrap(),
+            PLAYBACK_VOLUME_MAX_DB
+        );
+        assert!(normalize_playback_volume_db(PLAYBACK_VOLUME_MIN_DB - 0.1).is_err());
+        assert!(normalize_playback_volume_db(PLAYBACK_VOLUME_MAX_DB + 0.1).is_err());
+        assert!(normalize_playback_volume_db(f32::NAN).is_err());
+    }
+
+    #[test]
+    fn playback_volume_gain_preserves_neutral_and_limits_boost() {
+        let sample = 0.2;
+        assert_eq!(
+            apply_playback_gain(sample, playback_gain_from_db(0.0)),
+            sample
+        );
+
+        let quieter = apply_playback_gain(sample, playback_gain_from_db(-12.0));
+        assert!(quieter > 0.0 && quieter < sample);
+
+        let louder = apply_playback_gain(sample, playback_gain_from_db(12.0));
+        assert!(louder > sample && louder <= 1.0);
+        assert!(apply_playback_gain(1.0, playback_gain_from_db(12.0)) <= 1.0);
+    }
 
     #[test]
     fn endpoint_ids_must_be_native_cpal_ids() {

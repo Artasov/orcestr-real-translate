@@ -18,8 +18,8 @@ use tokio_tungstenite::tungstenite::{Error as WebSocketError, Message};
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use crate::audio::{
-    start_capture, start_playback, system_capture_output_match, AudioSource, CaptureHandle,
-    PlaybackHandle,
+    normalize_playback_volume_db, start_capture, start_playback, system_capture_output_match,
+    AudioSource, CaptureHandle, PlaybackHandle,
 };
 use crate::secret_store::SecretStore;
 
@@ -64,6 +64,7 @@ pub struct RealtimeStartRequest {
     pub channel: RealtimeChannel,
     pub mode: RealtimeMode,
     pub playback_enabled: bool,
+    pub playback_volume_db: f32,
     pub input_device_id: Option<String>,
     pub output_device_id: Option<String>,
     pub target_language: Option<String>,
@@ -105,6 +106,7 @@ struct NormalizedRequest {
     channel: RealtimeChannel,
     mode: RealtimeMode,
     playback_enabled: bool,
+    playback_volume_db: f32,
     input_device_id: Option<String>,
     output_device_id: Option<String>,
     target_language: Option<String>,
@@ -128,6 +130,10 @@ enum SessionCommand {
     Stop(oneshot::Sender<()>),
     SetPlaybackEnabled {
         enabled: bool,
+        result: oneshot::Sender<Result<(), String>>,
+    },
+    SetPlaybackVolume {
+        volume_db: f32,
         result: oneshot::Sender<Result<(), String>>,
     },
 }
@@ -225,7 +231,10 @@ impl RealtimeManager {
         drop(api_key);
 
         let mut playback = if request.playback_enabled {
-            Some(start_playback(request.output_device_id.as_deref())?)
+            Some(start_playback(
+                request.output_device_id.as_deref(),
+                request.playback_volume_db,
+            )?)
         } else {
             None
         };
@@ -268,6 +277,7 @@ impl RealtimeManager {
         let channel = request.channel;
         let mode = request.mode;
         let output_device_id = request.output_device_id.clone();
+        let playback_volume_db = request.playback_volume_db;
         tauri::async_runtime::spawn(async move {
             if begin_rx.await.is_err() {
                 stop_capture_handle(capture.take()).await;
@@ -285,6 +295,7 @@ impl RealtimeManager {
                 capture,
                 playback,
                 output_device_id,
+                playback_volume_db,
                 audio_rx,
                 level_rx,
                 command_rx,
@@ -381,6 +392,36 @@ impl RealtimeManager {
                 .await;
         }
         result
+    }
+
+    pub async fn set_playback_volume(
+        &self,
+        channel: RealtimeChannel,
+        volume_db: f32,
+    ) -> Result<(), String> {
+        let volume_db = normalize_playback_volume_db(volume_db)?;
+        let commands = {
+            let active = self.slot(channel).active.lock().await;
+            active
+                .as_ref()
+                .ok_or_else(|| "Realtime channel is not active".to_string())?
+                .commands
+                .clone()
+        };
+
+        let (result_tx, result_rx) = oneshot::channel();
+        commands
+            .send(SessionCommand::SetPlaybackVolume {
+                volume_db,
+                result: result_tx,
+            })
+            .await
+            .map_err(|_| "Realtime channel stopped before volume changed".to_string())?;
+        match tokio::time::timeout(PLAYBACK_CHANGE_TIMEOUT, result_rx).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => Err("Realtime channel stopped before volume changed".to_string()),
+            Err(_) => Err("Timed out while changing speech playback volume".to_string()),
+        }
     }
 
     async fn restore_playback_route(
@@ -494,6 +535,7 @@ async fn run_session(
     mut capture: Option<CaptureHandle>,
     mut playback: Option<PlaybackHandle>,
     output_device_id: Option<String>,
+    mut playback_volume_db: f32,
     mut audio_rx: mpsc::Receiver<Vec<i16>>,
     mut level_rx: mpsc::UnboundedReceiver<f32>,
     mut commands: mpsc::Receiver<SessionCommand>,
@@ -527,7 +569,10 @@ async fn run_session(
                         let change = if mode != RealtimeMode::Translate {
                             Err("Speech playback is only available for translation".to_string())
                         } else if enabled && playback.is_none() {
-                            match start_playback_async(output_device_id.clone()).await {
+                            match start_playback_async(
+                                output_device_id.clone(),
+                                playback_volume_db,
+                            ).await {
                                 Ok(handle) => {
                                     playback = Some(handle);
                                     Ok(())
@@ -540,6 +585,13 @@ async fn run_session(
                         } else {
                             Ok(())
                         };
+                        let _ = result.send(change);
+                    }
+                    Some(SessionCommand::SetPlaybackVolume { volume_db, result }) => {
+                        playback_volume_db = volume_db;
+                        let change = playback
+                            .as_ref()
+                            .map_or(Ok(()), |handle| handle.set_volume_db(volume_db));
                         let _ = result.send(change);
                     }
                     None => {
@@ -1092,6 +1144,7 @@ fn normalize_request(request: RealtimeStartRequest) -> Result<NormalizedRequest,
     let input_device_id = normalize_device_id(request.input_device_id)?;
     let output_device_id = normalize_device_id(request.output_device_id)?;
     let playback_enabled = request.mode == RealtimeMode::Translate && request.playback_enabled;
+    let playback_volume_db = normalize_playback_volume_db(request.playback_volume_db)?;
     let target_language = match request.mode {
         RealtimeMode::Transcribe => None,
         RealtimeMode::Translate => Some(normalize_target_language(
@@ -1105,6 +1158,7 @@ fn normalize_request(request: RealtimeStartRequest) -> Result<NormalizedRequest,
         channel: request.channel,
         mode: request.mode,
         playback_enabled,
+        playback_volume_db,
         input_device_id,
         output_device_id,
         target_language,
@@ -1333,10 +1387,15 @@ async fn stop_capture_handle(capture: Option<CaptureHandle>) {
     }
 }
 
-async fn start_playback_async(output_device_id: Option<String>) -> Result<PlaybackHandle, String> {
-    tauri::async_runtime::spawn_blocking(move || start_playback(output_device_id.as_deref()))
-        .await
-        .map_err(|_| "Audio playback worker terminated unexpectedly".to_string())?
+async fn start_playback_async(
+    output_device_id: Option<String>,
+    playback_volume_db: f32,
+) -> Result<PlaybackHandle, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        start_playback(output_device_id.as_deref(), playback_volume_db)
+    })
+    .await
+    .map_err(|_| "Audio playback worker terminated unexpectedly".to_string())?
 }
 
 async fn stop_playback(playback: Option<PlaybackHandle>) {
@@ -1354,6 +1413,7 @@ mod tests {
             channel,
             mode,
             playback_enabled: mode == RealtimeMode::Translate,
+            playback_volume_db: 0.0,
             input_device_id: None,
             output_device_id: None,
             target_language: (mode == RealtimeMode::Translate).then(|| "ru".to_string()),
@@ -1441,6 +1501,17 @@ mod tests {
                 .target_language
                 .is_none()
         );
+    }
+
+    #[test]
+    fn request_validation_rejects_playback_volume_outside_supported_range() {
+        let mut invalid = request(RealtimeChannel::Microphone, RealtimeMode::Translate);
+        invalid.playback_volume_db = 12.1;
+        assert!(normalize_request(invalid).is_err());
+
+        let mut neutral = request(RealtimeChannel::Microphone, RealtimeMode::Translate);
+        neutral.playback_volume_db = 0.0;
+        assert_eq!(normalize_request(neutral).unwrap().playback_volume_db, 0.0);
     }
 
     #[test]

@@ -4,6 +4,10 @@ import {
   DEFAULT_WORKSPACE_SETTINGS,
   WORKSPACE_SETTINGS_KEY,
   loadWorkspaceSettings,
+  normalizePlaybackVolume,
+  PLAYBACK_VOLUME_DEFAULT_DB,
+  PLAYBACK_VOLUME_MAX_DB,
+  PLAYBACK_VOLUME_MIN_DB,
   resolveDeviceId,
   saveWorkspaceSettings,
   systemFeedbackRisk,
@@ -79,6 +83,17 @@ function configuredSettings(): WorkspaceSettings {
 }
 
 describe("workspace settings", () => {
+  it("keeps neutral playback at 0 dB and clamps persisted volume", () => {
+    expect(DEFAULT_WORKSPACE_SETTINGS.microphone.playbackVolumeDb).toBe(
+      PLAYBACK_VOLUME_DEFAULT_DB,
+    );
+    expect(normalizePlaybackVolume(-999)).toBe(PLAYBACK_VOLUME_MIN_DB);
+    expect(normalizePlaybackVolume(999)).toBe(PLAYBACK_VOLUME_MAX_DB);
+    expect(normalizePlaybackVolume(Number.NaN)).toBe(
+      PLAYBACK_VOLUME_DEFAULT_DB,
+    );
+  });
+
   it("falls back safely when persisted settings are malformed", () => {
     const storage = new MemoryStorage();
     storage.setItem(WORKSPACE_SETTINGS_KEY, "{broken");

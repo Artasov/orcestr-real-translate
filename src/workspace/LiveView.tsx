@@ -36,6 +36,10 @@ interface LiveViewProps {
     patch: Partial<ChannelSettings>,
   ) => void;
   onPlaybackChange: (channel: RealtimeChannel, enabled: boolean) => void;
+  onPlaybackVolumeChange: (
+    channel: RealtimeChannel,
+    volumeDb: number,
+  ) => void;
   onOpenSettings: () => void;
   onClearTranscript: () => void;
 }
@@ -50,6 +54,7 @@ function LiveViewComponent({
   error,
   onChannelChange,
   onPlaybackChange,
+  onPlaybackVolumeChange,
   onOpenSettings,
   onClearTranscript,
 }: LiveViewProps) {
@@ -104,6 +109,9 @@ function LiveViewComponent({
           onPlaybackChange={(enabled) =>
             onPlaybackChange("microphone", enabled)
           }
+          onPlaybackVolumeChange={(volumeDb) =>
+            onPlaybackVolumeChange("microphone", volumeDb)
+          }
         />
         <ChannelPanel
           channel="system"
@@ -114,6 +122,9 @@ function LiveViewComponent({
           playbackPending={playbackPending.system}
           onChange={(patch) => onChannelChange("system", patch)}
           onPlaybackChange={(enabled) => onPlaybackChange("system", enabled)}
+          onPlaybackVolumeChange={(volumeDb) =>
+            onPlaybackVolumeChange("system", volumeDb)
+          }
         />
       </div>
 
