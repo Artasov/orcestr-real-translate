@@ -176,7 +176,9 @@ function runRelease(bump) {
   if (status("git", ["push", remote, "--delete", releaseBranch]) !== 0) {
     console.warn(`[release] Remote branch ${releaseBranch} could not be deleted automatically.`);
   }
-  if (status("git", ["branch", "-d", releaseBranch]) !== 0) {
+  // The release PR is squash-merged, so the original branch tip is not an
+  // ancestor of main even though GitHub confirmed the PR was merged.
+  if (status("git", ["branch", "-D", releaseBranch]) !== 0) {
     console.warn(`[release] Local branch ${releaseBranch} could not be deleted automatically.`);
   }
   console.log(`[release] ${tag} is published. Follow the tag-triggered CI/CD run in GitHub Actions.`);
