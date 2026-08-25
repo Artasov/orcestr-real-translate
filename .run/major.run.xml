@@ -1,9 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Bump major version (no git operations)" type="js.build_tools.npm">
+  <configuration default="false" name="Release major (PR + tag + push)" type="js.build_tools.npm">
     <package-json value="$PROJECT_DIR$/package.json" />
     <command value="run" />
     <scripts>
-      <script value="version:major" />
+      <script value="release:major" />
     </scripts>
     <node-interpreter value="project" />
     <envs />
