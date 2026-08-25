@@ -7,14 +7,18 @@ import type {
 } from "./types";
 
 export const WORKSPACE_SETTINGS_KEY =
-  "orcestr-real-translate:workspace-settings:v2";
+  "orcestr-real-translate:workspace-settings:v3";
 export const WINDOWS_PROCESS_LOOPBACK_ID = "windows-process-loopback";
+export const PLAYBACK_VOLUME_MIN_DB = -24;
+export const PLAYBACK_VOLUME_MAX_DB = 12;
+export const PLAYBACK_VOLUME_DEFAULT_DB = 0;
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   microphone: {
     enabled: true,
     mode: "translate",
     playbackEnabled: true,
+    playbackVolumeDb: PLAYBACK_VOLUME_DEFAULT_DB,
     inputDeviceId: null,
     outputDeviceId: null,
     targetLanguage: "en",
@@ -23,6 +27,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
     enabled: false,
     mode: "translate",
     playbackEnabled: true,
+    playbackVolumeDb: PLAYBACK_VOLUME_DEFAULT_DB,
     inputDeviceId: null,
     outputDeviceId: null,
     targetLanguage: "ru",
@@ -254,10 +259,20 @@ function normalizeChannel(
       typeof value.playbackEnabled === "boolean"
         ? value.playbackEnabled
         : fallback.playbackEnabled,
+    playbackVolumeDb: normalizePlaybackVolume(value.playbackVolumeDb),
     inputDeviceId: nullableId(value.inputDeviceId),
     outputDeviceId: nullableId(value.outputDeviceId),
     targetLanguage: languageCode(value.targetLanguage, fallback.targetLanguage),
   };
+}
+
+export function normalizePlaybackVolume(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return PLAYBACK_VOLUME_DEFAULT_DB;
+  }
+  return Math.round(
+    Math.min(PLAYBACK_VOLUME_MAX_DB, Math.max(PLAYBACK_VOLUME_MIN_DB, value)),
+  );
 }
 
 function nullableId(value: unknown): string | null {

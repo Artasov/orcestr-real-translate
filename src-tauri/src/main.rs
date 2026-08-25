@@ -262,6 +262,17 @@ async fn realtime_set_playback_enabled(
 }
 
 #[tauri::command]
+async fn realtime_set_playback_volume(
+    window: WebviewWindow,
+    realtime: State<'_, Arc<RealtimeManager>>,
+    channel: RealtimeChannel,
+    volume_db: f32,
+) -> Result<(), String> {
+    ensure_main_window(&window).map_err(|error| error.message)?;
+    realtime.set_playback_volume(channel, volume_db).await
+}
+
+#[tauri::command]
 async fn realtime_stop_all(
     window: WebviewWindow,
     app: AppHandle,
@@ -325,6 +336,7 @@ fn main() {
             audio_list_devices,
             realtime_start,
             realtime_set_playback_enabled,
+            realtime_set_playback_volume,
             realtime_stop,
             realtime_stop_all,
             update::check_app_update,

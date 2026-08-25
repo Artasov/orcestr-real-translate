@@ -1,15 +1,13 @@
 import {
   Badge,
   Flex,
-  IconButton,
   Section,
   SegmentedControl,
   Select,
   Switch,
   Text,
-  Tooltip,
 } from "@orcestr/ui";
-import { LuMic, LuMonitorUp, LuVolume2, LuVolumeX } from "react-icons/lu";
+import { LuMic, LuMonitorUp } from "react-icons/lu";
 
 import { useAppI18n } from "../i18n/I18nProvider";
 import type { AppText } from "../i18n/messages";
@@ -21,6 +19,7 @@ import type {
 } from "../realtime/types";
 import { languageItems } from "./constants";
 import { InfoHint } from "./InfoHint";
+import { PlaybackVolumeControl } from "./PlaybackVolumeControl";
 
 interface ChannelPanelProps {
   channel: RealtimeChannel;
@@ -31,6 +30,7 @@ interface ChannelPanelProps {
   playbackPending: boolean;
   onChange: (patch: Partial<ChannelSettings>) => void;
   onPlaybackChange: (enabled: boolean) => void;
+  onPlaybackVolumeChange: (volumeDb: number) => void;
 }
 
 export function ChannelPanel({
@@ -42,6 +42,7 @@ export function ChannelPanel({
   playbackPending,
   onChange,
   onPlaybackChange,
+  onPlaybackVolumeChange,
 }: ChannelPanelProps) {
   const { app, format, locale } = useAppI18n();
   const microphone = channel === "microphone";
@@ -134,40 +135,30 @@ export function ChannelPanel({
           disabled={locked || settings.mode === "transcribe"}
           testId={`${channel}-language`}
         />
-        <Tooltip
-          content={
+        <PlaybackVolumeControl
+          tooltip={
             settings.mode === "transcribe"
               ? app.channel.playbackTranslateOnly
               : playbackOn
                 ? app.channel.mutePlayback
                 : app.channel.playPlayback
           }
-        >
-          <IconButton
-            icon={
-              playbackOn ? <LuVolume2 size={16} /> : <LuVolumeX size={16} />
-            }
-            aria-label={
-              playbackOn
-                ? app.channel.disablePlayback
-                : app.channel.enablePlayback
-            }
-            aria-pressed={playbackOn}
-            tone={playbackOn ? "primary" : "neutral"}
-            v={playbackOn ? "soft" : "ghost"}
-            size={2}
-            className="channel-playback-toggle"
-            testId={`${channel}-playback`}
-            loading={playbackPending}
-            disabled={
-              disabled ||
-              settings.mode === "transcribe" ||
-              playbackLocked ||
-              playbackPending
-            }
-            onClick={() => onPlaybackChange(!playbackOn)}
-          />
-        </Tooltip>
+          toggleLabel={
+            playbackOn
+              ? app.channel.disablePlayback
+              : app.channel.enablePlayback
+          }
+          volumeLabel={app.channel.playbackVolume}
+          playbackOn={playbackOn}
+          playbackPending={playbackPending}
+          disabled={
+            disabled || settings.mode === "transcribe" || playbackLocked
+          }
+          volumeDb={settings.playbackVolumeDb}
+          onPlaybackChange={onPlaybackChange}
+          onVolumeChange={onPlaybackVolumeChange}
+          testId={`${channel}-playback`}
+        />
       </div>
 
       {runtime.error ? (

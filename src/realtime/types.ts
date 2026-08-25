@@ -53,6 +53,7 @@ export interface ChannelSettings {
   enabled: boolean;
   mode: RealtimeMode;
   playbackEnabled: boolean;
+  playbackVolumeDb: number;
   inputDeviceId: string | null;
   outputDeviceId: string | null;
   targetLanguage: string;
@@ -67,6 +68,7 @@ export interface RealtimeStartRequest {
   channel: RealtimeChannel;
   mode: RealtimeMode;
   playbackEnabled: boolean;
+  playbackVolumeDb: number;
   inputDeviceId?: string | null;
   outputDeviceId?: string | null;
   targetLanguage?: string | null;

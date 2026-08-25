@@ -1,5 +1,12 @@
 import { Button, Tabs } from "@orcestr/ui";
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { LuPlay, LuRadio, LuSettings, LuSquare } from "react-icons/lu";
 
 import type { OrcestrUser } from "../auth";
@@ -15,6 +22,7 @@ import {
 } from "../realtime/session";
 import {
   loadWorkspaceSettings,
+  normalizePlaybackVolume,
   resolveDeviceId,
   saveWorkspaceSettings,
   validateWorkspaceStart,
@@ -38,6 +46,8 @@ const NO_PLAYBACK_PENDING: Record<RealtimeChannel, boolean> = {
   microphone: false,
   system: false,
 };
+
+const PLAYBACK_VOLUME_UPDATE_INTERVAL_MS = 75;
 
 interface TranslateWorkspaceProps {
   user: OrcestrUser;
@@ -72,6 +82,17 @@ export function TranslateWorkspace({
     undefined,
     initialRealtimeSession,
   );
+  const desiredPlaybackVolume = useRef<Record<RealtimeChannel, number>>({
+    microphone: settings.microphone.playbackVolumeDb,
+    system: settings.system.playbackVolumeDb,
+  });
+  const playbackVolumeTimers = useRef<
+    Record<RealtimeChannel, number | null>
+  >({ microphone: null, system: null });
+  const activeChannels = useRef<Record<RealtimeChannel, boolean>>({
+    microphone: false,
+    system: false,
+  });
 
   const running = useMemo(
     () =>
@@ -79,6 +100,10 @@ export function TranslateWorkspace({
       isChannelActive(session.channels.system),
     [session.channels],
   );
+  activeChannels.current.microphone = isChannelActive(
+    session.channels.microphone,
+  );
+  activeChannels.current.system = isChannelActive(session.channels.system);
   const startValidation = useMemo(
     () => validateWorkspaceStart(settings, devices, keyConfigured),
     [devices, keyConfigured, settings],
@@ -87,6 +112,16 @@ export function TranslateWorkspace({
   useEffect(() => {
     saveWorkspaceSettings(settings);
   }, [settings]);
+
+  useEffect(
+    () => () => {
+      for (const channel of ["microphone", "system"] as const) {
+        const timer = playbackVolumeTimers.current[channel];
+        if (timer !== null) window.clearTimeout(timer);
+      }
+    },
+    [],
+  );
 
   const refreshDevices = useCallback(async () => {
     setDevicesLoading(true);
@@ -175,6 +210,7 @@ export function TranslateWorkspace({
             mode: config.mode,
             playbackEnabled:
               config.mode === "translate" && config.playbackEnabled,
+            playbackVolumeDb: config.playbackVolumeDb,
             inputDeviceId: resolveDeviceId(sources, config.inputDeviceId),
             outputDeviceId:
               config.mode === "translate"
@@ -240,6 +276,36 @@ export function TranslateWorkspace({
       void changePlayback(channel, enabled);
     },
     [changePlayback],
+  );
+
+  const changePlaybackVolume = useCallback(
+    (channel: RealtimeChannel, requestedVolumeDb: number) => {
+      const volumeDb = normalizePlaybackVolume(requestedVolumeDb);
+      desiredPlaybackVolume.current[channel] = volumeDb;
+      setSettings((current) => ({
+        ...current,
+        [channel]: { ...current[channel], playbackVolumeDb: volumeDb },
+      }));
+      setEngineError(null);
+
+      if (
+        !activeChannels.current[channel] ||
+        playbackVolumeTimers.current[channel] !== null
+      ) {
+        return;
+      }
+
+      playbackVolumeTimers.current[channel] = window.setTimeout(() => {
+        playbackVolumeTimers.current[channel] = null;
+        if (!activeChannels.current[channel]) return;
+        void nativeRealtime
+          .setPlaybackVolume(channel, desiredPlaybackVolume.current[channel])
+          .catch((error) => {
+            setEngineError(localizedErrorMessage(error, app.common, auth));
+          });
+      }, PLAYBACK_VOLUME_UPDATE_INTERVAL_MS);
+    },
+    [app.common, auth],
   );
 
   const stopSession = useCallback(async () => {
@@ -344,6 +410,7 @@ export function TranslateWorkspace({
               error={engineError}
               onChannelChange={changeChannel}
               onPlaybackChange={handlePlaybackChange}
+              onPlaybackVolumeChange={changePlaybackVolume}
               onOpenSettings={openSettings}
               onClearTranscript={clearTranscript}
             />
