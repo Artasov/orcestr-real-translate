@@ -1,0 +1,57 @@
+{
+  "name": "orcestr-real-translate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orcestr Real Translate desktop client",
+  "license": "MPL-2.0",
+  "type": "module",
+  "scripts": {
+    "auth:local": "node scripts/local-dependencies.mjs --auth-only",
+    "deps:install": "node scripts/local-dependencies.mjs",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri",
+    "dev:renderer": "vite",
+    "build:renderer": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:tooling": "node --test tests/*.test.mjs",
+    "test:watch": "vitest",
+    "pretest:rust": "npm run build:renderer",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --locked",
+    "version:check": "node scripts/version-bump.mjs --check",
+    "version:patch": "node scripts/version-bump.mjs patch",
+    "version:minor": "node scripts/version-bump.mjs minor",
+    "version:major": "node scripts/version-bump.mjs major",
+    "check": "npm run version:check && npm run typecheck && npm test && npm run test:tooling && npm run test:rust"
+  },
+  "dependencies": {
+    "@orcestr/auth-core": "file:../orcestr-auth/frontend/packages/core",
+    "@orcestr/auth-forms": "file:../orcestr-auth/frontend/packages/forms",
+    "@orcestr/auth-react": "file:../orcestr-auth/frontend/packages/react",
+    "@orcestr/core": "0.1.0",
+    "@orcestr/ui": "0.7.1",
+    "@tauri-apps/api": "2.11.1",
+    "@tanstack/react-query": "5.99.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-icons": "5.6.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "5.2.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  },
+  "optionalDependencies": {
+    "@tauri-apps/cli-win32-x64-msvc": "2.11.4"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
