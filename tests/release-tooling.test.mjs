@@ -31,6 +31,27 @@ test("release shortcuts calculate stable versions and invoke the PR/tag workflow
   }
 });
 
+test("repository notifier follows the shared Telegram integration contract", async () => {
+  const workflow = await readFile(
+    join(projectRoot, ".github", "workflows", "orcestr-repo-notifier.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /push:\s*\r?\n\s+branches:\s*\r?\n\s+- main/);
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /Artasov\/orcestr-repo-notifier@v1/);
+  for (const secret of [
+    "OPENAI_API_KEY",
+    "TELEGRAM_BOT_TOKEN",
+  ]) {
+    assert.match(workflow, new RegExp(`secrets\\.${secret}`));
+  }
+  assert.match(workflow, /telegram-chat-id: '@orcestrdev'/);
+  assert.match(workflow, /telegram-message-thread-id: '2'/);
+  assert.doesNotMatch(workflow, /secrets\.TELEGRAM_(?:CHAT_ID|MESSAGE_THREAD_ID)/);
+  assert.match(workflow, /First line: DEV UPDATE <b>Orcestr Real Translate<\/b>:/);
+  assert.doesNotMatch(workflow, /pull_request:/);
+});
+
 test("bundle collector enforces every matrix updater family and signature", async () => {
   const definitions = {
     windows: {

@@ -1,0 +1,73 @@
+name: Repo update to Telegram
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What should Codex write about?
+        required: true
+        type: string
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: Artasov/orcestr-repo-notifier@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          telegram-bot-token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          telegram-chat-id: '@orcestrdev'
+          telegram-message-thread-id: '2'
+          telegram-parse-mode: HTML
+          custom-task: ${{ github.event.inputs.task }}
+          mode: product
+          language: en
+          model: gpt-5.6-luna
+          effort: medium
+          custom-prompt: |
+            Write in English.
+            Return only the final Telegram message text. Do not explain the format.
+            These rules apply to automatic push updates and manual workflow tasks.
+            Automatic updates should cover meaningful Orcestr Real Translate desktop, realtime speech, audio capture, translation, transcription, playback, authentication, localization, updater, release, documentation, dependency, or workflow progress.
+            For automatic push updates, output exactly ORCESTR_NOTIFY_SKIP only when the entire push is formatting-only: Prettier or rustfmt autofix, import sorting, whitespace cleanup, generated file reformatting, or equivalent mechanical cleanup without semantic, configuration, documentation, workflow, dependency, or behavior changes.
+            Do not skip meaningful Tauri, Rust, React, OpenAI Realtime, microphone, system-audio loopback, audio processing, S3 packaging, updater signing, CI/CD, UI, accessibility, authentication, localization, dependency, or documentation changes.
+            If many changes are one repeated type of work, group them into one concise bullet.
+            Be concrete: name the affected channel, capture backend, processor, component, workflow, package, manifest, platform, or setting when the diff proves it.
+            For audio changes, distinguish microphone capture, system-audio capture, normalization, noise gating, compression, resampling, playback, device routing, and feedback prevention when applicable.
+            For realtime changes, distinguish transcription, translation, speech output, session lifecycle, OpenAI model configuration, and transcript handling when applicable.
+            For desktop changes, name Windows, macOS, Linux, Tauri updater, installer format, signing, or S3 manifest only when the diff proves it.
+            If package.json, package-lock.json, Cargo.toml, Cargo.lock, Tauri configuration, dependencies, scripts, release workflows, tags, or versions changed, mention the exact package or application version changes visible in the diff.
+            Never include credentials, signing material, API keys, secret values, private bucket details, or local filesystem paths.
+            Do not infer security, compatibility, cross-platform support, performance, or user-facing behavior that the diff does not prove.
+            Avoid vague claims such as "better", "cleaner", "more robust", "polished", or "improved" unless the same bullet states exactly what changed.
+            Use exactly this structure:
+            First line: DEV UPDATE <b>Orcestr Real Translate</b>:
+            For automatic push updates, second line: Stats: <commit_count> commits, +<added_lines>/-<deleted_lines> lines.
+            Use the exact commit count and line counts from the Change Stats section in context.
+            For manual workflow tasks, include the Stats line only if the task asks for change stats.
+            Then 3-5 bullet lines. Every bullet line must start with "• ".
+            Then one short closing line after a blank line.
+            After the closing line, always add exactly these two final link lines:
+            Product: https://orcestr.com/real-translate
+            Releases: https://github.com/Artasov/orcestr-real-translate/releases
+            If the push contains an application release or version bump, make the first bullet start with "• New release:" and include the exact version visible in the diff.
+            The closing line may be a concise thank-you, a note for users, or an invitation to try the product. Vary it between updates.
+            Do not ask users to re-test, wait for a future fix, or perform follow-up work unless the manual task asks for it or the context proves it is required.
+            Do not write filler such as "No visible app behavior changed".
+            Do not use Markdown headings, code fences, numbered lists, or plain paragraph lines for update items.
+            Telegram HTML parse mode is enabled. Use <b>...</b> sparingly for the product name and 1-2 important versions or components.
+            Do not use unsupported HTML tags, colors, spans, inline styles, or raw angle-bracket placeholders.
+            Do not include branch names, author names, commit hashes, raw file lists, compare links, or additional GitHub URLs.
+            Keep every bullet concise, factual, and readable in Telegram.
