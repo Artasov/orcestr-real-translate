@@ -35,7 +35,7 @@
     "@orcestr/auth-forms": "file:../orcestr-auth/frontend/packages/forms",
     "@orcestr/auth-react": "file:../orcestr-auth/frontend/packages/react",
     "@orcestr/core": "0.1.0",
-    "@orcestr/ui": "0.7.1",
+    "@orcestr/ui": "0.7.4",
     "@tauri-apps/api": "2.11.1",
     "@tanstack/react-query": "5.99.2",
     "react": "19.2.8",

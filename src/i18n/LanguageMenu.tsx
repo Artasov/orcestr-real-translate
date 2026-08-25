@@ -1,4 +1,4 @@
-import { IconButton, Menu, Tooltip } from "@orcestr/ui";
+import { IconButton, Menu } from "@orcestr/ui";
 import { LuCheck, LuLanguages } from "react-icons/lu";
 
 import { useAppI18n } from "./I18nProvider";
@@ -9,7 +9,7 @@ export function LanguageMenu({ className }: { className?: string }) {
 
   return (
     <Menu
-      align="end"
+      align="start"
       items={APP_LOCALE_OPTIONS.map((option) => ({
         key: option.value,
         label: option.label,
@@ -20,17 +20,16 @@ export function LanguageMenu({ className }: { className?: string }) {
         onSelect: () => setLocale(option.value),
       }))}
       trigger={
-        <Tooltip content={app.common.chooseLanguage}>
-          <IconButton
-            type="button"
-            icon={<LuLanguages size={17} />}
-            aria-label={app.common.chooseLanguage}
-            v="ghost"
-            tone="neutral"
-            size={2}
-            className={className}
-          />
-        </Tooltip>
+        <IconButton
+          type="button"
+          icon={<LuLanguages size={17} />}
+          aria-label={app.common.chooseLanguage}
+          title={app.common.chooseLanguage}
+          v="ghost"
+          tone="neutral"
+          size={2}
+          className={className}
+        />
       }
       testId="language-menu"
     />
