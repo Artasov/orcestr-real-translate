@@ -13,7 +13,7 @@ export function LanguageMenu({ className }: { className?: string }) {
       items={APP_LOCALE_OPTIONS.map((option) => ({
         key: option.value,
         label: option.label,
-        info:
+        icon:
           option.value === locale ? (
             <LuCheck size={14} aria-hidden="true" />
           ) : null,
