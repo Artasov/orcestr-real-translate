@@ -8,8 +8,11 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { authClient } from "./auth";
+import { installRendererDiagnostics } from "./diagnostics";
 import { AppI18nProvider, useAppI18n } from "./i18n/I18nProvider";
 import "./styles.css";
+
+installRendererDiagnostics();
 
 const queryClient = new QueryClient({
   defaultOptions: {

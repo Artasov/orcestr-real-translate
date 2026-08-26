@@ -20,14 +20,22 @@ test("release shortcuts calculate stable versions and invoke the PR/tag workflow
   assert.equal(releaseModule.nextStableVersion("1.2.3", "major"), "2.0.0");
   assert.throws(() => releaseModule.nextStableVersion("1.2.3-beta.1", "patch"));
 
-  const packageJson = JSON.parse(await readFile(join(projectRoot, "package.json"), "utf8"));
+  const packageJson = JSON.parse(
+    await readFile(join(projectRoot, "package.json"), "utf8"),
+  );
   for (const bump of ["patch", "minor", "major"]) {
-    assert.equal(packageJson.scripts[`release:${bump}`], `node scripts/release.mjs ${bump}`);
+    assert.equal(
+      packageJson.scripts[`release:${bump}`],
+      `node scripts/release.mjs ${bump}`,
+    );
     const runConfiguration = await readFile(
       join(projectRoot, ".run", `${bump}.run.xml`),
       "utf8",
     );
-    assert.match(runConfiguration, new RegExp(`<script value="release:${bump}"`));
+    assert.match(
+      runConfiguration,
+      new RegExp(`<script value="release:${bump}"`),
+    );
   }
 });
 
@@ -39,17 +47,47 @@ test("repository notifier follows the shared Telegram integration contract", asy
   assert.match(workflow, /push:\s*\r?\n\s+branches:\s*\r?\n\s+- main/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /Artasov\/orcestr-repo-notifier@v1/);
-  for (const secret of [
-    "OPENAI_API_KEY",
-    "TELEGRAM_BOT_TOKEN",
-  ]) {
+  for (const secret of ["OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN"]) {
     assert.match(workflow, new RegExp(`secrets\\.${secret}`));
   }
   assert.match(workflow, /telegram-chat-id: '@orcestrdev'/);
   assert.match(workflow, /telegram-message-thread-id: '2'/);
-  assert.doesNotMatch(workflow, /secrets\.TELEGRAM_(?:CHAT_ID|MESSAGE_THREAD_ID)/);
-  assert.match(workflow, /First line: DEV UPDATE <b>Orcestr Real Translate<\/b>:/);
+  assert.doesNotMatch(
+    workflow,
+    /secrets\.TELEGRAM_(?:CHAT_ID|MESSAGE_THREAD_ID)/,
+  );
+  assert.match(
+    workflow,
+    /First line: DEV UPDATE <b>Orcestr Real Translate<\/b>:/,
+  );
   assert.doesNotMatch(workflow, /pull_request:/);
+});
+
+test("production renderer deduplicates React and keeps diagnostics available", async () => {
+  const viteConfig = await readFile(
+    join(projectRoot, "vite.config.ts"),
+    "utf8",
+  );
+  const cargoManifest = await readFile(
+    join(projectRoot, "src-tauri", "Cargo.toml"),
+    "utf8",
+  );
+  const tauriConfig = JSON.parse(
+    await readFile(join(projectRoot, "src-tauri", "tauri.conf.json"), "utf8"),
+  );
+  const nativeMain = await readFile(
+    join(projectRoot, "src-tauri", "src", "main.rs"),
+    "utf8",
+  );
+
+  assert.match(
+    viteConfig,
+    /dedupe:\s*\["react",\s*"react-dom",\s*"@tanstack\/react-query"\]/,
+  );
+  assert.match(cargoManifest, /tauri = \{[^\n]+features = \["devtools"\]/);
+  assert.equal(tauriConfig.app.windows[0].devtools, true);
+  assert.match(nativeMain, /diagnostics::diagnostics_open_devtools/);
+  assert.match(nativeMain, /diagnostics::diagnostics_log_renderer/);
 });
 
 test("bundle collector enforces every matrix updater family and signature", async () => {
@@ -67,7 +105,11 @@ test("bundle collector enforces every matrix updater family and signature", asyn
     darwin: {
       runnerArch: "ARM64",
       releaseArchitecture: "universal",
-      files: ["Orcestr_1.2.3.dmg", "Orcestr.app.tar.gz", "Orcestr.app.tar.gz.sig"],
+      files: [
+        "Orcestr_1.2.3.dmg",
+        "Orcestr.app.tar.gz",
+        "Orcestr.app.tar.gz.sig",
+      ],
       targets: ["darwin-aarch64-app", "darwin-x86_64-app"],
     },
     linux: {
@@ -83,7 +125,9 @@ test("bundle collector enforces every matrix updater family and signature", asyn
   };
 
   for (const [platform, definition] of Object.entries(definitions)) {
-    const directory = await mkdtemp(join(tmpdir(), `orcestr-collect-${platform}-`));
+    const directory = await mkdtemp(
+      join(tmpdir(), `orcestr-collect-${platform}-`),
+    );
     const bundleDirectory = join(directory, "bundle", "nested");
     const outputDirectory = join(directory, "output");
     await mkdir(bundleDirectory, { recursive: true });
@@ -114,7 +158,10 @@ test("bundle collector enforces every matrix updater family and signature", asyn
     );
 
     const metadata = JSON.parse(
-      await readFile(join(outputDirectory, `${platform}-metadata.json`), "utf8"),
+      await readFile(
+        join(outputDirectory, `${platform}-metadata.json`),
+        "utf8",
+      ),
     );
     assert.deepEqual(
       metadata.updaters.map(({ target }) => target),
@@ -136,7 +183,9 @@ test("aggregate manifest is a valid bundle-specific Tauri updater manifest", asy
 
   for (const [platform, targets] of Object.entries(definitions)) {
     const files = targets.map((target) => `${target}.bundle`);
-    await Promise.all(files.map((name) => writeFile(join(directory, name), "artifact", "utf8")));
+    await Promise.all(
+      files.map((name) => writeFile(join(directory, name), "artifact", "utf8")),
+    );
     await writeFile(
       join(directory, `${platform}-metadata.json`),
       JSON.stringify({
@@ -167,7 +216,10 @@ test("aggregate manifest is a valid bundle-specific Tauri updater manifest", asy
       versionManifest,
       latestManifest,
     ],
-    { cwd: projectRoot, env: { ...process.env, SOURCE_DATE_EPOCH: sourceDateEpoch } },
+    {
+      cwd: projectRoot,
+      env: { ...process.env, SOURCE_DATE_EPOCH: sourceDateEpoch },
+    },
   );
   await run(
     process.execPath,
@@ -179,7 +231,10 @@ test("aggregate manifest is a valid bundle-specific Tauri updater manifest", asy
       repeatedVersionManifest,
       repeatedLatestManifest,
     ],
-    { cwd: projectRoot, env: { ...process.env, SOURCE_DATE_EPOCH: sourceDateEpoch } },
+    {
+      cwd: projectRoot,
+      env: { ...process.env, SOURCE_DATE_EPOCH: sourceDateEpoch },
+    },
   );
 
   const manifest = JSON.parse(await readFile(latestManifest, "utf8"));
@@ -217,7 +272,10 @@ test("aggregate manifest is a valid bundle-specific Tauri updater manifest", asy
         "https://downloads.example.test/bucket/",
         join(directory, "invalid-time.json"),
       ],
-      { cwd: projectRoot, env: { ...process.env, SOURCE_DATE_EPOCH: "not-a-time" } },
+      {
+        cwd: projectRoot,
+        env: { ...process.env, SOURCE_DATE_EPOCH: "not-a-time" },
+      },
     ),
     /SOURCE_DATE_EPOCH/,
   );
@@ -283,7 +341,10 @@ test("download manifest exposes deterministic public installers for every deskto
     "windows-x64",
   ]);
   assert.equal(manifest.targets["macos-universal"].length, 1);
-  assert.equal(manifest.targets["macos-universal"][0].name, "darwin-Orcestr.dmg");
+  assert.equal(
+    manifest.targets["macos-universal"][0].name,
+    "darwin-Orcestr.dmg",
+  );
   assert.equal(manifest.targets["linux-x64"].length, 2);
   assert.equal(
     manifest.targets["windows-x64"][0].url,
@@ -310,7 +371,12 @@ test("GitHub release notes expose S3 links and no GitHub asset path", async () =
   })) {
     await writeFile(
       join(directory, `${platform}-metadata.json`),
-      JSON.stringify({ platform, architecture: "x86_64", files: [file], updaters: [] }),
+      JSON.stringify({
+        platform,
+        architecture: "x86_64",
+        files: [file],
+        updaters: [],
+      }),
       "utf8",
     );
   }
@@ -326,7 +392,10 @@ test("GitHub release notes expose S3 links and no GitHub asset path", async () =
     output,
   ]);
   const notes = await readFile(output, "utf8");
-  assert.match(notes, /https:\/\/downloads\.example\.test\/root\/orcestr-real-translate\/v1\.2\.3\/windows-Orcestr-setup\.exe/);
+  assert.match(
+    notes,
+    /https:\/\/downloads\.example\.test\/root\/orcestr-real-translate\/v1\.2\.3\/windows-Orcestr-setup\.exe/,
+  );
   assert.match(notes, /intentionally contains no uploaded assets/);
   assert.doesNotMatch(notes, /github\.com\/.*\/download/);
 });
@@ -334,7 +403,9 @@ test("GitHub release notes expose S3 links and no GitHub asset path", async () =
 test("version bump synchronizes all five version-bearing files without git", async () => {
   const directory = await mkdtemp(join(tmpdir(), "orcestr-version-"));
   await mkdir(join(directory, "src-tauri"), { recursive: true });
-  const originalPackage = JSON.parse(await readFile(join(projectRoot, "package.json"), "utf8"));
+  const originalPackage = JSON.parse(
+    await readFile(join(projectRoot, "package.json"), "utf8"),
+  );
   const [major, minor, patch] = originalPackage.version.split(".").map(Number);
   const expected = `${major}.${minor}.${patch + 1}`;
   for (const path of [
@@ -354,13 +425,23 @@ test("version bump synchronizes all five version-bearing files without git", asy
   await run(process.execPath, [script, "patch"], { cwd: directory });
   await run(process.execPath, [script, "--check"], { cwd: directory });
 
-  const packageJson = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
-  const packageLock = JSON.parse(await readFile(join(directory, "package-lock.json"), "utf8"));
+  const packageJson = JSON.parse(
+    await readFile(join(directory, "package.json"), "utf8"),
+  );
+  const packageLock = JSON.parse(
+    await readFile(join(directory, "package-lock.json"), "utf8"),
+  );
   const tauriJson = JSON.parse(
     await readFile(join(directory, "src-tauri", "tauri.conf.json"), "utf8"),
   );
-  const cargoToml = await readFile(join(directory, "src-tauri", "Cargo.toml"), "utf8");
-  const cargoLock = await readFile(join(directory, "src-tauri", "Cargo.lock"), "utf8");
+  const cargoToml = await readFile(
+    join(directory, "src-tauri", "Cargo.toml"),
+    "utf8",
+  );
+  const cargoLock = await readFile(
+    join(directory, "src-tauri", "Cargo.lock"),
+    "utf8",
+  );
 
   assert.equal(packageJson.version, expected);
   assert.equal(packageLock.version, expected);
@@ -427,7 +508,9 @@ test("immutable object verification requires matching SHA-256 metadata and size"
 
   const script = join(projectRoot, "scripts", "verify-immutable-object.mjs");
   const fingerprint = (
-    await run(process.execPath, [script, "fingerprint", artifact], { cwd: projectRoot })
+    await run(process.execPath, [script, "fingerprint", artifact], {
+      cwd: projectRoot,
+    })
   ).stdout.trim();
   const [sha256, size] = fingerprint.split(" ");
   await writeFile(
@@ -441,7 +524,10 @@ test("immutable object verification requires matching SHA-256 metadata and size"
 
   await writeFile(
     headObject,
-    JSON.stringify({ ContentLength: Number(size), Metadata: { sha256: "0".repeat(64) } }),
+    JSON.stringify({
+      ContentLength: Number(size),
+      Metadata: { sha256: "0".repeat(64) },
+    }),
     "utf8",
   );
   await assert.rejects(
@@ -496,7 +582,10 @@ test("release workflow gates secrets and pins the auth SDK to a repository SHA",
   assert.doesNotMatch(workflow, /actions\/(?:upload|download)-artifact/);
   assert.match(workflow, /\.assets \| length/);
   assert.match(workflow, /--format=%ct/);
-  assert.match(workflow, /SOURCE_DATE_EPOCH: \$\{\{ steps\.release-time\.outputs\.source-date-epoch \}\}/);
+  assert.match(
+    workflow,
+    /SOURCE_DATE_EPOCH: \$\{\{ steps\.release-time\.outputs\.source-date-epoch \}\}/,
+  );
   assert.match(readme, /Windows x64/);
   assert.match(readme, /universal macOS \(Apple Silicon \+ Intel\)/);
   assert.match(readme, /Linux x64/);
