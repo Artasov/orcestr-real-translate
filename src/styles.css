@@ -50,6 +50,38 @@ a:focus-visible {
   outline-offset: 3px;
 }
 
+.fatal-bootstrap {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  width: min(520px, calc(100vw - 48px));
+  padding: 24px;
+  border-radius: 16px;
+  color: #f7f7fb;
+  background: rgb(15 13 20 / 94%);
+  box-shadow: 0 20px 60px rgb(0 0 0 / 55%);
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(20px);
+}
+
+.fatal-bootstrap h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+.fatal-bootstrap p {
+  margin: 8px 0;
+  color: #c7c2d1;
+  line-height: 1.5;
+}
+
+.fatal-bootstrap code {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 14px;
+  color: #c4b5fd;
+  font-size: 12px;
+}
+
 .app-shell {
   position: relative;
   isolation: isolate;

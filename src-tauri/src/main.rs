@@ -3,6 +3,7 @@
 mod audio;
 mod auth;
 mod config;
+mod diagnostics;
 mod realtime;
 mod secret_store;
 mod update;
@@ -301,8 +302,16 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let config = AuthConfig::load().map_err(std::io::Error::other)?;
-            let manager = Arc::new(AuthManager::new(config).map_err(std::io::Error::other)?);
+            let diagnostics = diagnostics::DiagnosticsLog::initialize(app.handle())?;
+            app.manage(diagnostics.clone());
+            let config = AuthConfig::load().map_err(|error| {
+                diagnostics.write("ERROR", &format!("Auth configuration failed: {error}"));
+                std::io::Error::other(error)
+            })?;
+            let manager = Arc::new(AuthManager::new(config).map_err(|error| {
+                diagnostics.write("ERROR", &format!("Auth manager startup failed: {error}"));
+                std::io::Error::other(error)
+            })?);
             app.manage(manager.clone());
             app.manage(Arc::new(SecretStore::new()));
             app.manage(Arc::new(RealtimeManager::new()));
@@ -314,6 +323,7 @@ fn main() {
             setup_deep_link_listener(app.handle(), manager.clone());
             flush_pending_deep_links(app.handle(), manager);
             update::start_background_check(app.handle().clone());
+            diagnostics.write("INFO", "Native application startup completed");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -339,6 +349,9 @@ fn main() {
             realtime_set_playback_volume,
             realtime_stop,
             realtime_stop_all,
+            diagnostics::diagnostics_log_renderer,
+            diagnostics::diagnostics_log_path,
+            diagnostics::diagnostics_open_devtools,
             update::check_app_update,
             update::install_app_update,
         ])
