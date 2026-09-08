@@ -6,10 +6,10 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   plugins: [react()],
   // The auth packages are local workspace links in development and CI. Without
-  // explicit deduplication Rollup resolves their peer dependencies from the
-  // auth workspace, producing a second React dispatcher in production only.
+  // explicit deduplication their peer dependencies resolve from the auth
+  // workspace, creating separate React dispatchers and UI overlay contexts.
   resolve: {
-    dedupe: ["react", "react-dom", "@tanstack/react-query"],
+    dedupe: ["react", "react-dom", "@tanstack/react-query", "@orcestr/ui"],
   },
   clearScreen: false,
   server: {
