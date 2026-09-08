@@ -63,7 +63,7 @@ test("repository notifier follows the shared Telegram integration contract", asy
   assert.doesNotMatch(workflow, /pull_request:/);
 });
 
-test("production renderer deduplicates React and keeps diagnostics available", async () => {
+test("production renderer deduplicates React and UI contexts and keeps diagnostics available", async () => {
   const viteConfig = await readFile(
     join(projectRoot, "vite.config.ts"),
     "utf8",
@@ -82,7 +82,7 @@ test("production renderer deduplicates React and keeps diagnostics available", a
 
   assert.match(
     viteConfig,
-    /dedupe:\s*\["react",\s*"react-dom",\s*"@tanstack\/react-query"\]/,
+    /dedupe:\s*\["react",\s*"react-dom",\s*"@tanstack\/react-query",\s*"@orcestr\/ui"\]/,
   );
   assert.match(cargoManifest, /tauri = \{[^\n]+features = \["devtools"\]/);
   assert.equal(tauriConfig.app.windows[0].devtools, true);
